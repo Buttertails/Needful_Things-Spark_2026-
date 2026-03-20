@@ -1,11 +1,16 @@
 from flask import Flask, redirect, request, make_response, jsonify
 from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
-import os, json, uuid
+import os, json, uuid, boto3
 from functools import wraps
 from jose import jwt
 
 CLOUDFRONT_URL = 'https://staging.d1lkt3hd0w7zxm.amplifyapp.com'
+BEDROCK_AGENT_ID = os.environ.get('BEDROCK_AGENT_ID')
+BEDROCK_AGENT_ALIAS_ID = os.environ.get('BEDROCK_AGENT_ALIAS_ID')
+bedrock = boto3.client('bedrock-agent-runtime', region_name='us-east-1')
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+table = dynamodb.Table('resources')
 DATA_FILE = '/tmp/resources.json'
 COGNITO_REGION = 'us-east-1'
 COGNITO_POOL_ID = 'us-east-1_kowqhZ4fl'
@@ -118,6 +123,30 @@ def get_matches():
         matches = [d for d in data if d['user_id'] != user_id]
 
     return jsonify(matches)
+
+@app.route('/api/chat', methods=['POST'])
+@require_auth
+def chat():
+    body = request.get_json()
+    message = body.get('message', '').strip()
+    session_id = body.get('session_id', str(uuid.uuid4()))
+    if not message:
+        return jsonify({'error': 'empty message'}), 400
+
+    response = bedrock.invoke_agent(
+        agentId=BEDROCK_AGENT_ID,
+        agentAliasId=BEDROCK_AGENT_ALIAS_ID,
+        sessionId=session_id,
+        inputText=message
+    )
+
+    # stream the completion chunks into a single string
+    reply = ''
+    for event in response['completion']:
+        if 'chunk' in event:
+            reply += event['chunk']['bytes'].decode('utf-8')
+
+    return jsonify({'reply': reply, 'session_id': session_id})
 
 if __name__ == '__main__':
     app.run(debug=True)
