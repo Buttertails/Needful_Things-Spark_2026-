@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nearby Resources</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: #2563eb; color: white; }
+    #header h1 { margin: 0; font-size: 1.1rem; }
+    #map { height: calc(100vh - 50px); }
+    .legend { background: white; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.85rem; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>Nearby Resources</h1>
+    <a href="/logout" style="color:white; font-size:0.85rem;">Logout</a>
+  </div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const role = localStorage.getItem('userRole') || 'both';
+    const map = L.map('map');
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Legend
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = () => {
+      const div = L.DomUtil.create('div', 'legend');
+      div.innerHTML = '🔴 Needs resources<br>🟢 Has resources';
+      return div;
+    };
+    legend.addTo(map);
+
+    function addMockPins(center) {
+      const pins = [
+        { lat: center[0] + 0.005, lng: center[1] + 0.008, type: 'need', label: 'Family needs food & supplies' },
+        { lat: center[0] - 0.003, lng: center[1] + 0.012, type: 'need', label: 'Individual needs shelter' },
+        { lat: center[0] + 0.009, lng: center[1] - 0.006, type: 'have', label: 'Offering: canned goods & clothing' },
+        { lat: center[0] - 0.007, lng: center[1] - 0.009, type: 'have', label: 'Offering: transportation & meals' },
+        { lat: center[0] + 0.002, lng: center[1] + 0.003, type: 'need', label: 'Senior needs medication pickup' },
+      ];
+
+      pins.forEach(pin => {
+        if (role === 'both' || role === pin.type) {
+          const color = pin.type === 'need' ? '🔴' : '🟢';
+          const icon = L.divIcon({ html: `<span style="font-size:1.5rem">${color}</span>`, className: '', iconAnchor: [12, 12] });
+          L.marker([pin.lat, pin.lng], { icon })
+            .addTo(map)
+            .bindPopup(pin.label);
+        }
+      });
+    }
+
+    // Center map on user location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const center = [pos.coords.latitude, pos.coords.longitude];
+        map.setView(center, 14);
+        L.marker(center).addTo(map).bindPopup('You are here').openPopup();
+        addMockPins(center);
+      }, () => fallback());
+    } else {
+      fallback();
+    }
+
+    function fallback() {
+      const center = [37.7749, -122.4194]; // San Francisco default
+      map.setView(center, 13);
+      addMockPins(center);
+    }
+  </script>
+</body>
+</html>
