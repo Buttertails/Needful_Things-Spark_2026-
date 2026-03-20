@@ -106,7 +106,7 @@
 
       const map = new maplibregl.Map({
         container: "map",
-        style: `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=Light`,
+        style: `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=Dark&terrain=Hillshade&contour-density=Medium&traffic=All`,
         center: [center[1], center[0]],
         zoom: 14,
         ...authHelper.getMapAuthenticationOptions()
