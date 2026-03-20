@@ -61,8 +61,14 @@ def require_auth(f):
     return decorated
 
 def make_conversation_id(user_a, user_b):
-    # always sort so conversation_id is consistent regardless of who initiates
     return '#'.join(sorted([user_a, user_b]))
+
+def get_display_name(user):
+    name = user.get('name', '')
+    if name:
+        return name.split()[0]
+    email = user.get('email', '')
+    return email.split('@')[0].split('.')[0].capitalize() if email else 'User'
 
 # --- auth routes ---
 
@@ -106,7 +112,7 @@ def post_resource():
         'user_id': user.get('sub'),
         'id': str(uuid.uuid4()),
         'type': body.get('type'),
-        'email': user.get('email'),
+        'display_name': get_display_name(user),
         'items': body.get('items', []),
         'lat': str(body.get('lat', '')),
         'lng': str(body.get('lng', '')),
@@ -234,7 +240,7 @@ def send_message():
         'timestamp': timestamp,
         'message_id': message_id,
         'sender_id': sender_id,
-        'sender_email': user.get('email', ''),
+        'sender_name': get_display_name(user),
         'recipient_id': recipient_id,
         'text': text,
         'read': False
@@ -296,7 +302,7 @@ def get_conversations():
             convos[cid] = {
                 'conversation_id': cid,
                 'other_user_id': other_id,
-                'other_email': msg['sender_email'] if msg['sender_id'] != user_id else msg.get('recipient_email', other_id),
+                'other_name': msg['sender_name'] if msg['sender_id'] != user_id else msg.get('sender_name', other_id),
                 'last_message': msg['text'],
                 'last_timestamp': msg['timestamp'],
                 'unread_count': 0

@@ -248,6 +248,17 @@
       } catch { return null; }
     }
 
+    function getDisplayName() {
+      const token = getToken();
+      if (!token) return 'User';
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.name) return payload.name.split(' ')[0];
+        if (payload.email) return payload.email.split('@')[0].split('.')[0];
+      } catch {}
+      return 'User';
+    }
+
     function authHeaders() {
       return { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' };
     }
@@ -355,9 +366,9 @@
           return;
         }
         list.innerHTML = convos.map(c => `
-          <div class="convo-item" onclick="openChat('${c.other_user_id}','${c.other_email}','${c.conversation_id}')">
+          <div class="convo-item" onclick="openChat('${c.other_user_id}','${c.other_name}','${c.conversation_id}')">
             <div class="convo-left">
-              <div class="convo-email">${c.other_email || c.other_user_id}</div>
+              <div class="convo-email">${c.other_name || c.other_user_id}</div>
               <div class="convo-preview">${c.last_message}</div>
             </div>
             <div class="convo-right">
@@ -372,13 +383,17 @@
       }
     }
 
-    function openChat(recipientId, recipientEmail, convoId) {
+    let lastMessageCount = 0;
+
+    function openChat(recipientId, recipientName, convoId) {
       activeChatRecipient = recipientId;
       activeChatConvoId = convoId;
-      document.getElementById('chat-title').textContent = recipientEmail || recipientId;
+      lastMessageCount = 0;
+      document.getElementById('chat-title').textContent = recipientName || recipientId;
       document.getElementById('convos-panel').classList.remove('open');
       document.getElementById('chat-panel').classList.add('open');
       document.getElementById('messages-list').innerHTML = '';
+      if (chatPollInterval) { clearInterval(chatPollInterval); chatPollInterval = null; }
       fetchMessages();
       chatPollInterval = setInterval(fetchMessages, 3000);
     }
@@ -395,6 +410,23 @@
     function renderMessages(msgs) {
       const myId = getMyUserId();
       const list = document.getElementById('messages-list');
+
+      if (msgs.length === lastMessageCount) {
+        // No new messages — just update read ticks in place
+        const myMsgs = msgs.filter(m => m.sender_id === myId);
+        list.querySelectorAll('.msg-bubble.msg-mine').forEach((bubble, i) => {
+          if (myMsgs[i]) {
+            const tick = bubble.querySelector('.read-tick');
+            if (tick) {
+              tick.className = `read-tick ${myMsgs[i].read ? 'read' : ''}`;
+              tick.textContent = myMsgs[i].read ? '✓✓' : '✓';
+            }
+          }
+        });
+        return;
+      }
+
+      lastMessageCount = msgs.length;
       const wasAtBottom = list.scrollHeight - list.scrollTop <= list.clientHeight + 50;
       list.innerHTML = msgs.map(m => {
         const mine = m.sender_id === myId;
@@ -417,13 +449,24 @@
       const text = input.value.trim();
       if (!text || !activeChatRecipient) return;
       input.value = '';
+
+      // Optimistically show message immediately
+      const myId = getMyUserId();
+      const list = document.getElementById('messages-list');
+      const div = document.createElement('div');
+      div.className = 'msg-bubble msg-mine';
+      div.innerHTML = `${text}<div class="msg-meta"><span>${formatTime(new Date().toISOString())}</span><span class="read-tick">✓</span></div>`;
+      list.appendChild(div);
+      list.scrollTop = list.scrollHeight;
+      lastMessageCount++;
+
       try {
         await fetch(`${API_BASE}/api/messages`, {
           method: 'POST', credentials: 'include',
           headers: authHeaders(),
           body: JSON.stringify({ recipient_id: activeChatRecipient, text })
         });
-        fetchMessages();
+        await fetchMessages();
       } catch (e) { console.warn('Could not send message', e); }
     }
 
@@ -478,7 +521,7 @@
           ? `<br><small>🎯 ${m.match_score} match${m.match_score > 1 ? 'es' : ''}</small>` : '';
         const popup = new maplibregl.Popup({ offset: 20 }).setHTML(`
           <b>${m.type === 'need' ? 'Needs' : 'Has'}:</b> ${m.items.join(', ')}${score}
-          <br><button onclick="startChat('${m.user_id}','${m.email}')"
+          <br><button onclick="startChat('${m.user_id}','${m.display_name || m.email}')"
             style="margin-top:0.5rem;padding:0.3rem 0.75rem;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem;">
             💬 Message
           </button>
