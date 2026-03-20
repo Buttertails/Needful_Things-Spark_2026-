@@ -20,6 +20,20 @@
       z-index: 10;
     }
     #header h1 { margin: 0; font-size: 1.1rem; }
+    #header-right { display: flex; align-items: center; gap: 0.5rem; }
+    .map-btn {
+      padding: 0.3rem 0.7rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.12);
+      color: white;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .map-btn:hover { background: rgba(255,255,255,0.22); }
+    .map-btn.active { background: rgba(255,255,255,0.3); border-color: white; }
     #map { height: calc(100vh - 50px); width: 100%; }
     .legend {
       position: absolute;
@@ -54,13 +68,19 @@
     #add-panel .tag { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 0.25rem 0.6rem; border-radius: 20px; margin: 0.2rem; font-size: 0.8rem; cursor: pointer; }
     #add-panel .save-btn { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-top: 1rem; }
     #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 25; }
-    #overlay.open { display: block; }</style>
+    #overlay.open { display: block; }
+  </style>
 </head>
 <body>
   <div id="header">
     <h1>Nearby Resources</h1>
-    <a href="https://dybar52ziekaj.cloudfront.net/logout" style="color:white; font-size:0.85rem;">Logout</a>
+    <div id="header-right">
+      <button class="map-btn" id="btn-scheme" onclick="toggleScheme()">☀️ Light</button>
+      <button class="map-btn" id="btn-style" onclick="toggleMapStyle()">🛰️ Satellite</button>
+      <a href="https://dybar52ziekaj.cloudfront.net/logout" style="color:white; font-size:0.85rem; margin-left:0.25rem;">Logout</a>
+    </div>
   </div>
+
   <div id="map"></div>
   <div class="legend">🔴 Needs resources<br>🟢 Has resources</div>
 
@@ -94,14 +114,52 @@
     const region = "us-east-1";
     const API_BASE = "https://dybar52ziekaj.cloudfront.net";
     const role = localStorage.getItem('userRole') || 'both';
+
+    let isDark = false;
+    let isSatellite = false;
     let currentFilter = 'match';
     let mapInstance = null;
     let userCenter = null;
     let panelType = 'have';
     let panelItems = [];
     let youMarker = null;
+    let markers = [];
 
     function getToken() { return localStorage.getItem('id_token') || ''; }
+
+    // --- map style ---
+    function buildStyleUrl() {
+      if (isSatellite) {
+        return `https://maps.geo.${region}.amazonaws.com/v2/styles/Satellite/descriptor`;
+      }
+      const scheme = isDark ? 'Dark' : 'Light';
+      return `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=${scheme}`;
+    }
+
+    function toggleScheme() {
+      isDark = !isDark;
+      const btn = document.getElementById('btn-scheme');
+      btn.textContent = isDark ? '☀️ Light' : '🌙 Dark';
+      btn.classList.toggle('active', isDark);
+      reloadStyle();
+    }
+
+    function toggleMapStyle() {
+      isSatellite = !isSatellite;
+      const btn = document.getElementById('btn-style');
+      btn.textContent = isSatellite ? '🗺️ Standard' : '🛰️ Satellite';
+      btn.classList.toggle('active', isSatellite);
+      reloadStyle();
+    }
+
+    function reloadStyle() {
+      if (!mapInstance) return;
+      mapInstance.setStyle(buildStyleUrl());
+      mapInstance.once('style.load', () => {
+        youMarker = null;
+        if (userCenter) loadPins(mapInstance, userCenter);
+      });
+    }
 
     // --- filter ---
     function setFilter(f) {
@@ -152,7 +210,8 @@
 
     // --- pins ---
     async function loadPins(map, center) {
-      document.querySelectorAll('.map-marker').forEach(el => el.parentNode && el.parentNode.remove());
+      markers.forEach(m => m.remove());
+      markers = [];
 
       if (!youMarker) {
         const youEl = document.createElement('div');
@@ -162,6 +221,7 @@
           .setLngLat([center[1], center[0]])
           .setPopup(new maplibregl.Popup().setHTML('<strong>You are here</strong>'))
           .addTo(map);
+        markers.push(youMarker);
       }
 
       let apiRole = role;
@@ -181,18 +241,18 @@
       matches.forEach(m => {
         if (!m.lat || !m.lng) return;
         const el = document.createElement('div');
-        el.className = 'map-marker';
         el.innerHTML = m.type === 'need' ? '🔴' : '🟢';
         el.style.fontSize = '1.5rem';
         el.style.cursor = 'pointer';
         const score = (currentFilter === 'match' && m.match_score > 0)
           ? `<br><small>🎯 ${m.match_score} match${m.match_score > 1 ? 'es' : ''}</small>` : '';
-        new maplibregl.Marker({ element: el })
+        const marker = new maplibregl.Marker({ element: el })
           .setLngLat([m.lng, m.lat])
           .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(
             `<b>${m.type === 'need' ? 'Needs' : 'Has'}:</b> ${m.items.join(', ')}${score}`
           ))
           .addTo(map);
+        markers.push(marker);
       });
     }
 
@@ -201,7 +261,7 @@
       const authHelper = await amazonLocationAuthHelper.withIdentityPoolId(identityPoolId);
       const map = new maplibregl.Map({
         container: "map",
-        style: `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=Light`,
+        style: buildStyleUrl(),
         center: [center[1], center[0]],
         zoom: 14,
         ...authHelper.getMapAuthenticationOptions()
