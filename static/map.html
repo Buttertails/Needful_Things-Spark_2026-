@@ -53,6 +53,7 @@
   <script>
     const identityPoolId = "us-east-1:0260092b-d425-423c-af14-b051783cf76b";
     const region = "us-east-1";
+    const COGNITO_POOL_ID = "us-east-1_kowqhZ4fl";
     const API_BASE = "https://dybar52ziekaj.cloudfront.net";
     const role = localStorage.getItem('userRole') || 'both';
 
@@ -104,8 +105,14 @@
       });
     }
 
-    async function initializeMap(center) {
-      const authHelper = await amazonLocationAuthHelper.withIdentityPoolId(identityPoolId);
+    async function initializeMap(center, id_token) {
+      const authHelper = await amazonLocationAuthHelper.withCognitoIdentityPool(
+        identityPoolId, {
+          logins: {
+            [`cognito-idp.${region}.amazonaws.com/${COGNITO_POOL_ID}`]: id_token
+          }
+        }
+      );
 
       const map = new maplibregl.Map({
         container: "map",
@@ -129,18 +136,35 @@
       map.on('load', () => addPins(map, matches, center));
     }
 
-    function fallback() {
-      initializeMap([37.7749, -122.4194]);
+    async function start() {
+      // Fetch Cognito token from Flask backend
+      let id_token = null;
+      try {
+        const tokenRes = await fetch(`${API_BASE}/api/token`, { credentials: 'include' });
+        if (!tokenRes.ok) {
+          window.location.href = '/login';
+          return;
+        }
+        const data = await tokenRes.json();
+        id_token = data.id_token;
+      } catch (e) {
+        console.error('Could not fetch token', e);
+        window.location.href = '/login';
+        return;
+      }
+
+      // Get location then init map
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => initializeMap([pos.coords.latitude, pos.coords.longitude], id_token),
+          () => initializeMap([37.7749, -122.4194], id_token)
+        );
+      } else {
+        initializeMap([37.7749, -122.4194], id_token);
+      }
     }
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => initializeMap([pos.coords.latitude, pos.coords.longitude]),
-        () => fallback()
-      );
-    } else {
-      fallback();
-    }
+    start();
   </script>
 </body>
 </html>

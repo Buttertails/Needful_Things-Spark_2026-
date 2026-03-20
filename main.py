@@ -12,7 +12,7 @@ COGNITO_POOL_ID = 'us-east-1_kowqhZ4fl'
 CLIENT_ID = '25is9h8u5rka8qi4sti9qnu0d2'
 
 app = Flask(__name__)
-CORS(app, origins=[CLOUDFRONT_URL, 'https://staging.d1lkt3hd0w7zxm.amplifyapp.com'], supports_credentials=True)
+CORS(app, origins=[CLOUDFRONT_URL, 'https://dybar52ziekaj.cloudfront.net'], supports_credentials=True)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 oauth = OAuth(app)
 
@@ -76,6 +76,14 @@ def logout():
     resp.delete_cookie('id_token')
     return resp
 
+# --- token endpoint for map auth ---
+
+@app.route('/api/token')
+@require_auth
+def get_token():
+    id_token = request.cookies.get('id_token')
+    return jsonify({'id_token': id_token})
+
 # --- resource API ---
 
 @app.route('/api/resources', methods=['POST'])
@@ -87,13 +95,12 @@ def post_resource():
         'id': str(uuid.uuid4()),
         'user_id': user.get('sub'),
         'email': user.get('email'),
-        'type': body.get('type'),        # 'have' or 'need'
-        'items': body.get('items', []),  # list of resource strings
+        'type': body.get('type'),
+        'items': body.get('items', []),
         'lat': body.get('lat'),
         'lng': body.get('lng'),
     }
     data = load_data()
-    # replace existing entry for this user+type
     data = [d for d in data if not (d['user_id'] == entry['user_id'] and d['type'] == entry['type'])]
     data.append(entry)
     save_data(data)
@@ -103,18 +110,15 @@ def post_resource():
 @require_auth
 def get_matches():
     user = get_current_user()
-    role = request.args.get('role', 'both')  # 'need', 'have', or 'both'
+    role = request.args.get('role', 'both')
     data = load_data()
     user_id = user.get('sub')
 
     if role == 'need':
-        # user needs resources, show people who have them
         matches = [d for d in data if d['type'] == 'have' and d['user_id'] != user_id]
     elif role == 'have':
-        # user has resources, show people who need them
         matches = [d for d in data if d['type'] == 'need' and d['user_id'] != user_id]
     else:
-        # show everything except own entries
         matches = [d for d in data if d['user_id'] != user_id]
 
     return jsonify(matches)
