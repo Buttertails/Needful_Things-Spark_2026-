@@ -38,63 +38,155 @@
       padding: 0.75rem 1rem;
       font-size: 0.9rem;
     }
-  </style>
+    /* filter bar */
+    #filter-bar { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 0.5rem; background: white; padding: 0.4rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    #filter-bar button { padding: 0.4rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; background: #f1f5f9; color: #333; }
+    #filter-bar button.active { background: #2563eb; color: white; }
+    /* add resources panel */
+    #add-btn { position: fixed; bottom: 5rem; left: 1.5rem; padding: 0.6rem 1.2rem; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 0.9rem; cursor: pointer; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    #add-panel { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 16px 16px 0 0; padding: 1.5rem; z-index: 30; box-shadow: 0 -4px 24px rgba(0,0,0,0.15); max-height: 60vh; overflow-y: auto; }
+    #add-panel.open { display: block; }
+    #add-panel h3 { margin: 0 0 1rem; }
+    #add-panel .type-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    #add-panel .type-btn { flex: 1; padding: 0.5rem; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-size: 0.9rem; }
+    #add-panel .type-btn.active { border-color: #2563eb; background: #eff6ff; }
+    #add-panel input { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    #add-panel .tag { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 0.25rem 0.6rem; border-radius: 20px; margin: 0.2rem; font-size: 0.8rem; cursor: pointer; }
+    #add-panel .save-btn { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-top: 1rem; }
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 25; }
+    #overlay.open { display: block; }</style>
 </head>
 <body>
   <div id="header">
     <h1>Nearby Resources</h1>
-    <a href="/logout" style="color:white; font-size:0.85rem;">Logout</a>
+    <a href="https://dybar52ziekaj.cloudfront.net/logout" style="color:white; font-size:0.85rem;">Logout</a>
   </div>
   <div id="map"></div>
   <div class="legend">🔴 Needs resources<br>🟢 Has resources</div>
 
+  <!-- filter bar -->
+  <div id="filter-bar">
+    <button id="f-match" class="active" onclick="setFilter('match')">My Matches</button>
+    <button id="f-need" onclick="setFilter('need')">All In Need</button>
+    <button id="f-have" onclick="setFilter('have')">All Offering</button>
+    <button id="f-all" onclick="setFilter('all')">Everyone</button>
+  </div>
+
+  <!-- add resources -->
+  <button id="add-btn" onclick="openPanel()">+ Add Resources</button>
+  <div id="overlay" onclick="closePanel()"></div>
+  <div id="add-panel">
+    <h3>Add Resources</h3>
+    <div class="type-row">
+      <button class="type-btn active" id="type-have" onclick="selectType('have')">🤝 I Have</button>
+      <button class="type-btn" id="type-need" onclick="selectType('need')">🙏 I Need</button>
+    </div>
+    <input type="text" id="panel-input" placeholder="e.g. food, blankets... press Enter" />
+    <div id="panel-tags"></div>
+    <button class="save-btn" onclick="saveResources()">Save & Update Map</button>
+  </div>
+
   <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
   <script src="https://unpkg.com/@aws/amazon-location-utilities-auth-helper@1.x/dist/amazonLocationAuthHelper.js"></script>
+  <script src="/chat-widget.js"></script>
   <script>
     const identityPoolId = "us-east-1:0260092b-d425-423c-af14-b051783cf76b";
     const region = "us-east-1";
     const API_BASE = "https://dybar52ziekaj.cloudfront.net";
     const role = localStorage.getItem('userRole') || 'both';
+    let currentFilter = 'match';
+    let mapInstance = null;
+    let userCenter = null;
+    let panelType = 'have';
+    let panelItems = [];
+    let youMarker = null;
 
-    function getToken() {
-      return localStorage.getItem('id_token') || '';
+    function getToken() { return localStorage.getItem('id_token') || ''; }
+
+    // --- filter ---
+    function setFilter(f) {
+      currentFilter = f;
+      ['match','need','have','all'].forEach(x => document.getElementById(`f-${x}`).classList.toggle('active', x === f));
+      if (mapInstance && userCenter) loadPins(mapInstance, userCenter);
     }
 
-    function addPins(map, matches, center) {
-      // "You are here" marker
-      const youEl = document.createElement('div');
-      youEl.innerHTML = '📍';
-      youEl.style.fontSize = '2rem';
-      new maplibregl.Marker({ element: youEl })
-        .setLngLat([center[1], center[0]])
-        .setPopup(new maplibregl.Popup().setHTML('<strong>You are here</strong>'))
-        .addTo(map);
+    // --- add panel ---
+    function openPanel() {
+      document.getElementById('add-panel').classList.add('open');
+      document.getElementById('overlay').classList.add('open');
+    }
+    function closePanel() {
+      document.getElementById('add-panel').classList.remove('open');
+      document.getElementById('overlay').classList.remove('open');
+    }
+    function selectType(t) {
+      panelType = t;
+      document.getElementById('type-have').classList.toggle('active', t === 'have');
+      document.getElementById('type-need').classList.toggle('active', t === 'need');
+    }
+    document.getElementById('panel-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const val = e.target.value.trim();
+        if (val && !panelItems.includes(val)) { panelItems.push(val); renderPanelTags(); }
+        e.target.value = '';
+      }
+    });
+    function renderPanelTags() {
+      document.getElementById('panel-tags').innerHTML = panelItems.map((item, i) =>
+        `<span class="tag" onclick="panelItems.splice(${i},1);renderPanelTags()">✕ ${item}</span>`
+      ).join('');
+    }
+    async function saveResources() {
+      if (!panelItems.length) return;
+      const loc = userCenter ? { lat: userCenter[0], lng: userCenter[1] } : { lat: null, lng: null };
+      await fetch(`${API_BASE}/api/resources`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+        body: JSON.stringify({ type: panelType, items: [...panelItems], ...loc })
+      });
+      panelItems = [];
+      renderPanelTags();
+      closePanel();
+      if (mapInstance && userCenter) loadPins(mapInstance, userCenter);
+    }
 
-      if (!matches || matches.length === 0) {
-        // Fall back to mock pins if no real data yet
-        const mockPins = [
-        ];
-        mockPins.forEach(pin => {
-          const el = document.createElement('div');
-          el.innerHTML = pin.type === 'need' ? '🔴' : '🟢';
-          el.style.fontSize = '1.5rem';
-          el.style.cursor = 'pointer';
-          new maplibregl.Marker({ element: el })
-            .setLngLat([center[1] + pin.offset[1], center[0] + pin.offset[0]])
-            .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(`<div>${pin.label}</div>`))
-            .addTo(map);
-        });
-        return;
+    // --- pins ---
+    async function loadPins(map, center) {
+      document.querySelectorAll('.map-marker').forEach(el => el.parentNode && el.parentNode.remove());
+
+      if (!youMarker) {
+        const youEl = document.createElement('div');
+        youEl.innerHTML = '📍';
+        youEl.style.fontSize = '2rem';
+        youMarker = new maplibregl.Marker({ element: youEl })
+          .setLngLat([center[1], center[0]])
+          .setPopup(new maplibregl.Popup().setHTML('<strong>You are here</strong>'))
+          .addTo(map);
       }
 
-      // Real pins from API
+      let apiRole = role;
+      if (currentFilter === 'need') apiRole = 'have';
+      else if (currentFilter === 'have') apiRole = 'need';
+      else if (currentFilter === 'all') apiRole = 'both';
+
+      let matches = [];
+      try {
+        const res = await fetch(`${API_BASE}/api/match?role=${apiRole}`, {
+          credentials: 'include',
+          headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (res.ok) matches = await res.json();
+      } catch (e) { console.warn('Could not fetch matches', e); }
+
       matches.forEach(m => {
         if (!m.lat || !m.lng) return;
         const el = document.createElement('div');
+        el.className = 'map-marker';
         el.innerHTML = m.type === 'need' ? '🔴' : '🟢';
         el.style.fontSize = '1.5rem';
         el.style.cursor = 'pointer';
-        const score = m.match_score > 0 ? `<br><small>🎯 ${m.match_score} item match${m.match_score > 1 ? 'es' : ''}</small>` : '';
+        const score = (currentFilter === 'match' && m.match_score > 0)
+          ? `<br><small>🎯 ${m.match_score} match${m.match_score > 1 ? 'es' : ''}</small>` : '';
         new maplibregl.Marker({ element: el })
           .setLngLat([m.lng, m.lat])
           .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(
@@ -105,44 +197,27 @@
     }
 
     async function initializeMap(center) {
+      userCenter = center;
       const authHelper = await amazonLocationAuthHelper.withIdentityPoolId(identityPoolId);
-
       const map = new maplibregl.Map({
         container: "map",
-        style: `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=Dark&terrain=Hillshade&contour-density=Medium&traffic=All`,
+        style: `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=Light`,
         center: [center[1], center[0]],
         zoom: 14,
         ...authHelper.getMapAuthenticationOptions()
       });
-
       map.addControl(new maplibregl.NavigationControl(), "top-left");
-
-      // Fetch real matches from API
-      let matches = [];
-      try {
-        const res = await fetch(`${API_BASE}/api/match?role=${role}`, {
-          credentials: 'include',
-          headers: { 'Authorization': `Bearer ${getToken()}` }
-        });
-        if (res.ok) matches = await res.json();
-      } catch (e) {
-        console.warn('Could not fetch matches, using mock pins', e);
-      }
-
-      map.on('load', () => addPins(map, matches, center));
-    }
-
-    function fallback() {
-      initializeMap([37.7749, -122.4194]);
+      mapInstance = map;
+      map.on('load', () => loadPins(map, center));
     }
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => initializeMap([pos.coords.latitude, pos.coords.longitude]),
-        () => fallback()
+        () => initializeMap([37.7749, -122.4194])
       );
     } else {
-      fallback();
+      initializeMap([37.7749, -122.4194]);
     }
   </script>
 </body>

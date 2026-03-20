@@ -1,24 +1,19 @@
 from flask import Flask, redirect, request, make_response, jsonify
 from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
-<<<<<<< Updated upstream
 import os, json, uuid
-=======
 import os, boto3
->>>>>>> Stashed changes
 from functools import wraps
 from jose import jwt
 
 CLOUDFRONT_URL = 'https://staging.d1lkt3hd0w7zxm.amplifyapp.com'
-<<<<<<< Updated upstream
+
 DATA_FILE = '/tmp/resources.json'
-=======
 BEDROCK_AGENT_ID = os.environ.get('BEDROCK_AGENT_ID')
 BEDROCK_AGENT_ALIAS_ID = os.environ.get('BEDROCK_AGENT_ALIAS_ID')
 bedrock = boto3.client('bedrock-agent-runtime', region_name='us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 table = dynamodb.Table('resources')
->>>>>>> Stashed changes
 COGNITO_REGION = 'us-east-1'
 COGNITO_POOL_ID = 'us-east-1_kowqhZ4fl'
 CLIENT_ID = '25is9h8u5rka8qi4sti9qnu0d2'

@@ -15,6 +15,7 @@
     .card p { margin: 0; font-size: 0.9rem; }
     .btn { margin-top: 2rem; padding: 0.75rem 2.5rem; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; opacity: 0.4; pointer-events: none; }
     .btn.active { opacity: 1; pointer-events: auto; }
+    .skip { margin-top: 1rem; background: none; border: none; color: #888; font-size: 0.9rem; cursor: pointer; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -31,6 +32,7 @@
     </div>
   </div>
   <button class="btn" id="continueBtn" onclick="proceed()">Continue</button>
+  <button class="skip" onclick="skipToMap()">Skip — just show me the map</button>
 
   <script>
     // Store token from URL fragment if present
@@ -59,6 +61,11 @@
       const role = selected.size === 2 ? 'both' : [...selected][0];
       localStorage.setItem('userRole', role);
       window.location.href = '/resources.html';
+    }
+
+    function skipToMap() {
+      localStorage.setItem('userRole', localStorage.getItem('userRole') || 'both');
+      window.location.href = '/map.html';
     }
   </script>
 </body>
