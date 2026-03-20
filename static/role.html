@@ -33,6 +33,14 @@
   <button class="btn" id="continueBtn" onclick="proceed()">Continue</button>
 
   <script>
+    // Store token from URL fragment if present
+    const hash = window.location.hash;
+    if (hash.includes('token=')) {
+      const token = hash.split('token=')[1];
+      localStorage.setItem('id_token', token);
+      history.replaceState(null, '', window.location.pathname);
+    }
+
     const selected = new Set();
 
     function toggle(card) {

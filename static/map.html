@@ -56,6 +56,10 @@
     const API_BASE = "https://dybar52ziekaj.cloudfront.net";
     const role = localStorage.getItem('userRole') || 'both';
 
+    function getToken() {
+      return localStorage.getItem('id_token') || '';
+    }
+
     function addPins(map, matches, center) {
       // "You are here" marker
       const youEl = document.createElement('div');
@@ -69,11 +73,6 @@
       if (!matches || matches.length === 0) {
         // Fall back to mock pins if no real data yet
         const mockPins = [
-          { type: 'need', label: 'Family needs food & supplies', offset: [0.005, 0.008] },
-          { type: 'need', label: 'Individual needs shelter', offset: [-0.003, 0.012] },
-          { type: 'have', label: 'Offering: canned goods & clothing', offset: [0.009, -0.006] },
-          { type: 'have', label: 'Offering: transportation & meals', offset: [-0.007, -0.009] },
-          { type: 'need', label: 'Senior needs medication pickup', offset: [0.002, 0.003] },
         ];
         mockPins.forEach(pin => {
           const el = document.createElement('div');
@@ -95,10 +94,11 @@
         el.innerHTML = m.type === 'need' ? '🔴' : '🟢';
         el.style.fontSize = '1.5rem';
         el.style.cursor = 'pointer';
+        const score = m.match_score > 0 ? `<br><small>🎯 ${m.match_score} item match${m.match_score > 1 ? 'es' : ''}</small>` : '';
         new maplibregl.Marker({ element: el })
           .setLngLat([m.lng, m.lat])
           .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(
-            `<b>${m.type === 'need' ? 'Needs' : 'Has'}:</b> ${m.items.join(', ')}`
+            `<b>${m.type === 'need' ? 'Needs' : 'Has'}:</b> ${m.items.join(', ')}${score}`
           ))
           .addTo(map);
       });
@@ -109,7 +109,7 @@
 
       const map = new maplibregl.Map({
         container: "map",
-        style: `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=Light`,
+        style: `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=Dark&terrain=Hillshade&contour-density=Medium&traffic=All`,
         center: [center[1], center[0]],
         zoom: 14,
         ...authHelper.getMapAuthenticationOptions()
@@ -120,7 +120,10 @@
       // Fetch real matches from API
       let matches = [];
       try {
-        const res = await fetch(`${API_BASE}/api/match?role=${role}`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE}/api/match?role=${role}`, {
+          credentials: 'include',
+          headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
         if (res.ok) matches = await res.json();
       } catch (e) {
         console.warn('Could not fetch matches, using mock pins', e);

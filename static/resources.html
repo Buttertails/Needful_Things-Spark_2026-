@@ -74,6 +74,10 @@
       });
     }
 
+    function getToken() {
+      return localStorage.getItem('id_token') || '';
+    }
+
     async function submit() {
       if (!items.length) return;
       const btn = document.getElementById('submitBtn');
@@ -86,7 +90,7 @@
         await fetch('https://dybar52ziekaj.cloudfront.net/api/resources', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
           body: JSON.stringify({ type, items, lat: loc.lat, lng: loc.lng })
         });
       }

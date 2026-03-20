@@ -1,12 +1,24 @@
 from flask import Flask, redirect, request, make_response, jsonify
 from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
+<<<<<<< Updated upstream
 import os, json, uuid
+=======
+import os, boto3
+>>>>>>> Stashed changes
 from functools import wraps
 from jose import jwt
 
 CLOUDFRONT_URL = 'https://staging.d1lkt3hd0w7zxm.amplifyapp.com'
+<<<<<<< Updated upstream
 DATA_FILE = '/tmp/resources.json'
+=======
+BEDROCK_AGENT_ID = os.environ.get('BEDROCK_AGENT_ID')
+BEDROCK_AGENT_ALIAS_ID = os.environ.get('BEDROCK_AGENT_ALIAS_ID')
+bedrock = boto3.client('bedrock-agent-runtime', region_name='us-east-1')
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+table = dynamodb.Table('resources')
+>>>>>>> Stashed changes
 COGNITO_REGION = 'us-east-1'
 COGNITO_POOL_ID = 'us-east-1_kowqhZ4fl'
 CLIENT_ID = '25is9h8u5rka8qi4sti9qnu0d2'
@@ -27,18 +39,12 @@ oauth.register(
 
 # --- helpers ---
 
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return []
-    with open(DATA_FILE) as f:
-        return json.load(f)
-
-def save_data(data):
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f)
-
 def get_current_user():
     token = request.cookies.get('id_token')
+    if not token:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
     if not token:
         return None
     try:
@@ -66,8 +72,8 @@ def login():
 def authorize():
     token = oauth.oidc.authorize_access_token()
     id_token = token.get('id_token', '')
-    resp = make_response(redirect(f'{CLOUDFRONT_URL}/role.html'))
-    resp.set_cookie('id_token', id_token, secure=True, samesite='Lax')
+    # Pass token via URL fragment to static page — fragment never hits the server
+    resp = make_response(redirect(f'{CLOUDFRONT_URL}/role.html#token={id_token}'))
     return resp
 
 @app.route('/logout')
@@ -78,44 +84,76 @@ def logout():
 
 # --- resource API ---
 
+@app.route('/api/debug-auth')
+def debug_auth():
+    token_cookie = request.cookies.get('id_token', 'none')
+    auth_header = request.headers.get('Authorization', 'none')
+    return jsonify({'cookie': token_cookie[:20] if token_cookie != 'none' else 'none', 'header': auth_header[:20] if auth_header != 'none' else 'none'})
+
 @app.route('/api/resources', methods=['POST'])
 @require_auth
 def post_resource():
     user = get_current_user()
     body = request.get_json()
     entry = {
-        'id': str(uuid.uuid4()),
         'user_id': user.get('sub'),
+        'type': body.get('type'),
         'email': user.get('email'),
-        'type': body.get('type'),        # 'have' or 'need'
-        'items': body.get('items', []),  # list of resource strings
-        'lat': body.get('lat'),
-        'lng': body.get('lng'),
+        'items': body.get('items', []),
+        'lat': str(body.get('lat', '')),
+        'lng': str(body.get('lng', '')),
     }
-    data = load_data()
-    # replace existing entry for this user+type
-    data = [d for d in data if not (d['user_id'] == entry['user_id'] and d['type'] == entry['type'])]
-    data.append(entry)
-    save_data(data)
+    table.put_item(Item=entry)
     return jsonify(entry), 201
 
 @app.route('/api/match', methods=['GET'])
 @require_auth
 def get_matches():
     user = get_current_user()
-    role = request.args.get('role', 'both')  # 'need', 'have', or 'both'
-    data = load_data()
+    role = request.args.get('role', 'both')
     user_id = user.get('sub')
 
+    result = table.scan()
+    data = result.get('Items', [])
+
+    # get current user's own entries to match against
+    user_entries = [d for d in data if d['user_id'] == user_id]
+    user_needs = set()
+    user_haves = set()
+    for e in user_entries:
+        items = set(i.lower().strip() for i in e.get('items', []))
+        if e['type'] == 'need':
+            user_needs.update(items)
+        elif e['type'] == 'have':
+            user_haves.update(items)
+
+    def match_score(entry):
+        items = set(i.lower().strip() for i in entry.get('items', []))
+        if entry['type'] == 'have':
+            # they have things — score by overlap with what user needs
+            return len(items & user_needs) if user_needs else 1
+        else:
+            # they need things — score by overlap with what user has
+            return len(items & user_haves) if user_haves else 1
+
     if role == 'need':
-        # user needs resources, show people who have them
         matches = [d for d in data if d['type'] == 'have' and d['user_id'] != user_id]
     elif role == 'have':
-        # user has resources, show people who need them
         matches = [d for d in data if d['type'] == 'need' and d['user_id'] != user_id]
     else:
-        # show everything except own entries
         matches = [d for d in data if d['user_id'] != user_id]
+
+    # sort by match score descending, include score in response
+    for m in matches:
+        m['match_score'] = match_score(m)
+        try:
+            m['lat'] = float(m['lat'])
+            m['lng'] = float(m['lng'])
+        except (ValueError, TypeError):
+            m['lat'] = None
+            m['lng'] = None
+
+    matches.sort(key=lambda x: x['match_score'], reverse=True)
 
     return jsonify(matches)
 

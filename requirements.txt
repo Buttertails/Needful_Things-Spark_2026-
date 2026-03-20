@@ -4,3 +4,4 @@ gunicorn
 requests
 python-jose
 flask-cors
+boto3
