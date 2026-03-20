@@ -3,3 +3,4 @@ authlib
 gunicorn
 requests
 python-jose
+flask-cors

@@ -1,5 +1,6 @@
 from flask import Flask, redirect, request, make_response, jsonify
 from authlib.integrations.flask_client import OAuth
+from flask_cors import CORS
 import os, json, uuid
 from functools import wraps
 from jose import jwt
@@ -11,6 +12,7 @@ COGNITO_POOL_ID = 'us-east-1_kowqhZ4fl'
 CLIENT_ID = '25is9h8u5rka8qi4sti9qnu0d2'
 
 app = Flask(__name__)
+CORS(app, origins=[CLOUDFRONT_URL, 'https://staging.d1lkt3hd0w7zxm.amplifyapp.com'], supports_credentials=True)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 oauth = OAuth(app)
 
