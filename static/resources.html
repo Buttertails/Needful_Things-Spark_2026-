@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Your Resources</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f5f5f5; padding: 1rem; box-sizing: border-box; }
+    h1 { margin-bottom: 0.25rem; }
+    p { color: #555; margin-bottom: 1.5rem; }
+    .form { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 100%; max-width: 480px; }
+    input[type=text] { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; box-sizing: border-box; margin-bottom: 0.5rem; }
+    .tag { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 0.3rem 0.75rem; border-radius: 20px; margin: 0.25rem; font-size: 0.85rem; cursor: pointer; }
+    .tag:hover { background: #c7d2fe; }
+    .tags { margin-bottom: 1rem; }
+    .btn { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-top: 1rem; }
+    .btn:disabled { opacity: 0.5; }
+    #status { margin-top: 1rem; color: #16a34a; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1 id="title">What do you have?</h1>
+  <p id="subtitle">Add items you can offer to people nearby.</p>
+
+  <div class="form">
+    <input type="text" id="itemInput" placeholder="e.g. canned food, blankets, rides..." />
+    <div class="tags" id="tagList"></div>
+    <small style="color:#888">Press Enter to add each item. Click a tag to remove it.</small>
+    <button class="btn" id="submitBtn" onclick="submit()">Save and see map</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const role = localStorage.getItem('userRole') || 'have';
+    const items = [];
+
+    if (role === 'need') {
+      document.getElementById('title').textContent = 'What do you need?';
+      document.getElementById('subtitle').textContent = 'Add items you are looking for nearby.';
+      document.getElementById('itemInput').placeholder = 'e.g. food, shelter, medication...';
+    }
+
+    document.getElementById('itemInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = e.target.value.trim();
+        if (val && !items.includes(val)) {
+          items.push(val);
+          renderTags();
+        }
+        e.target.value = '';
+      }
+    });
+
+    function renderTags() {
+      const list = document.getElementById('tagList');
+      list.innerHTML = items.map((item, i) =>
+        `<span class="tag" onclick="removeItem(${i})">✕ ${item}</span>`
+      ).join('');
+    }
+
+    function removeItem(i) {
+      items.splice(i, 1);
+      renderTags();
+    }
+
+    function getLocation() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve({ lat: null, lng: null });
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve({ lat: null, lng: null })
+        );
+      });
+    }
+
+    async function submit() {
+      if (!items.length) return;
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      const loc = await getLocation();
+
+      // if both roles, submit two entries
+      const types = role === 'both' ? ['have', 'need'] : [role];
+      for (const type of types) {
+        await fetch('https://dybar52ziekaj.cloudfront.net/api/resources', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, items, lat: loc.lat, lng: loc.lng })
+        });
+      }
+
+      document.getElementById('status').textContent = 'Saved! Taking you to the map...';
+      setTimeout(() => window.location.href = '/map.html', 1000);
+    }
+  </script>
+</body>
+</html>

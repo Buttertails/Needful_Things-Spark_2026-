@@ -39,23 +39,18 @@
     legend.addTo(map);
 
     function addMockPins(center) {
-      const pins = [
-        { lat: center[0] + 0.005, lng: center[1] + 0.008, type: 'need', label: 'Family needs food & supplies' },
-        { lat: center[0] - 0.003, lng: center[1] + 0.012, type: 'need', label: 'Individual needs shelter' },
-        { lat: center[0] + 0.009, lng: center[1] - 0.006, type: 'have', label: 'Offering: canned goods & clothing' },
-        { lat: center[0] - 0.007, lng: center[1] - 0.009, type: 'have', label: 'Offering: transportation & meals' },
-        { lat: center[0] + 0.002, lng: center[1] + 0.003, type: 'need', label: 'Senior needs medication pickup' },
-      ];
-
-      pins.forEach(pin => {
-        if (role === 'both' || role === pin.type) {
-          const color = pin.type === 'need' ? '🔴' : '🟢';
-          const icon = L.divIcon({ html: `<span style="font-size:1.5rem">${color}</span>`, className: '', iconAnchor: [12, 12] });
-          L.marker([pin.lat, pin.lng], { icon })
-            .addTo(map)
-            .bindPopup(pin.label);
-        }
-      });
+      fetch(`https://dybar52ziekaj.cloudfront.net/api/match?role=${role}`, { credentials: 'include' })
+        .then(r => r.json())
+        .then(matches => {
+          matches.forEach(m => {
+            if (!m.lat || !m.lng) return;
+            const color = m.type === 'need' ? '🔴' : '🟢';
+            const icon = L.divIcon({ html: `<span style="font-size:1.5rem">${color}</span>`, className: '', iconAnchor: [12, 12] });
+            L.marker([m.lat, m.lng], { icon })
+              .addTo(map)
+              .bindPopup(`<b>${m.type === 'need' ? 'Needs' : 'Has'}:</b> ${m.items.join(', ')}`);
+          });
+        });
     }
 
     // Center map on user location
