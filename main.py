@@ -64,7 +64,10 @@ def make_conversation_id(user_a, user_b):
     return '#'.join(sorted([user_a, user_b]))
 
 def get_display_name(user):
-    name = user.get('name', '')
+    given = user.get('given_name', '').strip()
+    if given:
+        return given
+    name = user.get('name', '').strip()
     if name:
         return name.split()[0]
     email = user.get('email', '')
@@ -190,8 +193,29 @@ def get_matches():
             m['lat'] = None
             m['lng'] = None
 
-    matches.sort(key=lambda x: x['match_score'], reverse=True)
-    return jsonify(matches)
+    # Group by user_id — merge all entries for the same user into one pin
+    grouped = {}
+    for m in matches:
+        uid = m['user_id']
+        if uid not in grouped:
+            grouped[uid] = {
+                'user_id': uid,
+                'display_name': m.get('display_name', ''),
+                'lat': m['lat'],
+                'lng': m['lng'],
+                'match_score': m['match_score'],
+                'entries': []
+            }
+        grouped[uid]['entries'].append({
+            'type': m['type'],
+            'items': m.get('items', []),
+            'match_score': m['match_score']
+        })
+        if m['match_score'] > grouped[uid]['match_score']:
+            grouped[uid]['match_score'] = m['match_score']
+
+    result = sorted(grouped.values(), key=lambda x: x['match_score'], reverse=True)
+    return jsonify(result)
 
 # --- bedrock chat ---
 
@@ -242,17 +266,21 @@ def send_message():
         'sender_id': sender_id,
         'sender_name': get_display_name(user),
         'recipient_id': recipient_id,
+        'recipient_name': body.get('recipient_name', ''),
         'text': text,
         'read': False
     }
     messages_table.put_item(Item=message)
     return jsonify(message), 201
 
-@app.route('/api/messages/<conversation_id>', methods=['GET'])
+@app.route('/api/messages', methods=['GET'])
 @require_auth
-def get_messages(conversation_id):
+def get_messages():
     user = get_current_user()
     user_id = user.get('sub')
+    conversation_id = request.args.get('convo_id', '')
+    if not conversation_id:
+        return jsonify({'error': 'convo_id required'}), 400
 
     # verify user is part of this conversation
     participants = conversation_id.split('#')
@@ -299,10 +327,11 @@ def get_conversations():
         cid = msg['conversation_id']
         other_id = participants[0] if participants[1] == user_id else participants[1]
         if cid not in convos:
+            other_name = msg['sender_name'] if msg['sender_id'] != user_id else msg.get('recipient_name', other_id)
             convos[cid] = {
                 'conversation_id': cid,
                 'other_user_id': other_id,
-                'other_name': msg['sender_name'] if msg['sender_id'] != user_id else msg.get('sender_name', other_id),
+                'other_name': other_name,
                 'last_message': msg['text'],
                 'last_timestamp': msg['timestamp'],
                 'unread_count': 0

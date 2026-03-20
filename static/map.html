@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Nearby Resources</title>
+  <title>Needful Things</title>
   <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: sans-serif; }
     #header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0.75rem 1rem; background: #2563eb; color: white;
+      padding: 0.75rem 1rem; background: #0f172a; color: white;
       height: 50px; position: relative; z-index: 10;
+      border-bottom: 1px solid rgba(99,179,237,0.15);
     }
     #header h1 { margin: 0; font-size: 1.1rem; }
     #header-right { display: flex; align-items: center; gap: 0.5rem; }
@@ -39,7 +40,6 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     .maplibregl-popup-content { border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.9rem; }
-    /* filter bar */
     #filter-bar {
       position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
       z-index: 10; display: flex; gap: 0.5rem; background: white;
@@ -50,14 +50,12 @@
       cursor: pointer; font-size: 0.85rem; background: #f1f5f9; color: #333;
     }
     #filter-bar button.active { background: #2563eb; color: white; }
-    /* add resources */
     #add-btn {
       position: fixed; bottom: 5rem; left: 1.5rem; padding: 0.6rem 1.2rem;
       background: #2563eb; color: white; border: none; border-radius: 8px;
       font-size: 0.9rem; cursor: pointer; z-index: 20;
       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    /* shared panel styles */
     .bottom-panel {
       display: none; position: fixed; bottom: 0; left: 0; right: 0;
       background: white; border-radius: 16px 16px 0 0; padding: 1.5rem;
@@ -70,99 +68,68 @@
     .close-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #64748b; }
     #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 25; }
     #overlay.open { display: block; }
-    /* add panel */
     #add-panel .type-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-    #add-panel .type-btn {
-      flex: 1; padding: 0.5rem; border: 2px solid #ddd;
-      border-radius: 8px; background: white; cursor: pointer; font-size: 0.9rem;
-    }
+    #add-panel .type-btn { flex: 1; padding: 0.5rem; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-size: 0.9rem; }
     #add-panel .type-btn.active { border-color: #2563eb; background: #eff6ff; }
-    #add-panel input {
-      width: 100%; padding: 0.6rem; border: 1px solid #ddd;
-      border-radius: 6px; font-size: 0.9rem; margin-bottom: 0.5rem;
-    }
-    .tag {
-      display: inline-block; background: #e0e7ff; color: #3730a3;
-      padding: 0.25rem 0.6rem; border-radius: 20px; margin: 0.2rem;
-      font-size: 0.8rem; cursor: pointer;
-    }
-    .action-btn {
-      width: 100%; padding: 0.75rem; background: #2563eb; color: white;
-      border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-top: 1rem;
-    }
-    /* conversations panel */
-    .convo-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; cursor: pointer;
-    }
+    #add-panel input { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .tag { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 0.25rem 0.6rem; border-radius: 20px; margin: 0.2rem; font-size: 0.8rem; cursor: pointer; }
+    .action-btn { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-top: 1rem; }
+    .my-resource { display: flex; align-items: flex-start; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+    .my-resource .del-btn { padding: 0.2rem 0.5rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; background: #fee2e2; color: #dc2626; flex-shrink: 0; margin-left: 0.5rem; }
+    .convo-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
     .convo-item:hover { background: #f8fafc; border-radius: 8px; padding-left: 0.5rem; }
     .convo-left { flex: 1; }
-    .convo-email { font-weight: 500; font-size: 0.9rem; color: #1e293b; }
+    .convo-name { font-weight: 500; font-size: 0.9rem; color: #1e293b; }
     .convo-preview { font-size: 0.8rem; color: #94a3b8; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
     .convo-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .convo-time { font-size: 0.75rem; color: #94a3b8; }
-    .unread-pill {
-      background: #2563eb; color: white; border-radius: 10px;
-      padding: 1px 7px; font-size: 0.72rem; font-weight: 600;
-    }
-    /* chat panel */
+    .unread-pill { background: #2563eb; color: white; border-radius: 10px; padding: 1px 7px; font-size: 0.72rem; font-weight: 600; }
     #chat-panel { padding: 0; }
     #chat-panel .panel-header { padding: 1.25rem 1.5rem 0.75rem; border-bottom: 1px solid #f1f5f9; }
-    #messages-list {
-      flex: 1; overflow-y: auto; padding: 1rem 1.5rem;
-      display: flex; flex-direction: column; gap: 0.5rem; min-height: 200px;
-    }
-    .msg-bubble {
-      max-width: 75%; padding: 0.5rem 0.85rem; border-radius: 16px;
-      font-size: 0.9rem; line-height: 1.4; position: relative;
-    }
-    .msg-mine {
-      background: #2563eb; color: white; align-self: flex-end;
-      border-bottom-right-radius: 4px;
-    }
-    .msg-theirs {
-      background: #f1f5f9; color: #1e293b; align-self: flex-start;
-      border-bottom-left-radius: 4px;
-    }
-    .msg-meta {
-      font-size: 0.68rem; margin-top: 3px; text-align: right;
-      display: flex; align-items: center; justify-content: flex-end; gap: 3px;
-    }
+    #messages-list { flex: 1; overflow-y: auto; padding: 1rem 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 200px; max-height: 40vh; }
+    .msg-bubble { max-width: 75%; padding: 0.5rem 0.85rem; border-radius: 16px; font-size: 0.9rem; line-height: 1.4; }
+    .msg-mine { background: #2563eb; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg-theirs { background: #f1f5f9; color: #1e293b; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .msg-meta { font-size: 0.68rem; margin-top: 3px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
     .msg-mine .msg-meta { color: rgba(255,255,255,0.7); }
     .msg-theirs .msg-meta { color: #94a3b8; }
     .read-tick { font-size: 0.75rem; }
     .read-tick.read { color: #60a5fa; }
-    #chat-input-row {
-      display: flex; gap: 0.5rem; padding: 0.75rem 1.5rem 1.25rem;
-      border-top: 1px solid #f1f5f9;
-    }
-    #chat-input {
-      flex: 1; padding: 0.6rem 0.9rem; border: 1px solid #ddd;
-      border-radius: 20px; font-size: 0.9rem; outline: none;
-    }
+    #chat-input-row { display: flex; gap: 0.5rem; padding: 0.75rem 1.5rem 1.25rem; border-top: 1px solid #f1f5f9; }
+    #chat-input { flex: 1; padding: 0.6rem 0.9rem; border: 1px solid #ddd; border-radius: 20px; font-size: 0.9rem; outline: none; }
     #chat-input:focus { border-color: #2563eb; }
-    #chat-send {
-      padding: 0.6rem 1rem; background: #2563eb; color: white;
-      border: none; border-radius: 20px; cursor: pointer; font-size: 0.9rem;
-    }
+    #chat-send { padding: 0.6rem 1rem; background: #2563eb; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 0.9rem; }
+    /* AI chat box */
+    #ai-chat-box { display: none; position: fixed; bottom: 60px; right: 1rem; width: 300px; max-height: 420px; background: white; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); z-index: 100; flex-direction: column; overflow: hidden; }
+    #ai-chat-box.open { display: flex; }
+    #ai-chat-header { background: #7c3aed; color: white; padding: 0.6rem 1rem; font-weight: 600; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+    #ai-chat-messages { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .ai-msg { padding: 0.5rem 0.75rem; border-radius: 8px; max-width: 85%; font-size: 0.85rem; line-height: 1.4; }
+    .ai-msg.user { background: #7c3aed; color: white; align-self: flex-end; }
+    .ai-msg.bot { background: #f1f5f9; color: #1e293b; align-self: flex-start; }
+    #ai-input-row { display: flex; border-top: 1px solid #e2e8f0; }
+    #ai-chat-input { flex: 1; padding: 0.6rem; border: none; outline: none; font-size: 0.85rem; }
+    #ai-chat-send { padding: 0.6rem 0.9rem; background: #7c3aed; color: white; border: none; cursor: pointer; font-size: 0.85rem; }
   </style>
 </head>
 <body>
   <div id="header">
-    <h1>Nearby Resources</h1>
+    <h1>Needful Things</h1>
     <div id="header-right">
       <button class="map-btn" id="btn-scheme" onclick="toggleScheme()">☀️ Light</button>
       <button class="map-btn" id="btn-style" onclick="toggleMapStyle()">🛰️ Satellite</button>
+
       <button class="map-btn" id="msg-btn" onclick="openConversations()">
         💬 Messages
         <span id="unread-badge"></span>
       </button>
-      <a href="https://dybar52ziekaj.cloudfront.net/logout" style="color:white; font-size:0.85rem; margin-left:0.25rem;">Logout</a>
+      <button class="map-btn" id="ai-btn" onclick="toggleAiChat()" style="background:rgba(124,58,237,0.5);border-color:rgba(167,139,250,0.5)">🤖 AI</button>
+      <a href="https://dybar52ziekaj.cloudfront.net/logout" style="color:white;font-size:0.85rem;margin-left:0.25rem;">Logout</a>
     </div>
   </div>
 
   <div id="map"></div>
-  <div class="legend">🔴 Needs resources<br>🟢 Has resources</div>
+  <div class="legend">🔴 Needs resources<br>🟢 Has resources<br>🟡 Both</div>
 
   <div id="filter-bar">
     <button id="f-match" class="active" onclick="setFilter('match')">My Matches</button>
@@ -172,8 +139,20 @@
   </div>
 
   <button id="add-btn" onclick="openAddPanel()">+ Add Resources</button>
-
   <div id="overlay" onclick="closeAll()"></div>
+
+  <!-- AI chat box -->
+  <div id="ai-chat-box">
+    <div id="ai-chat-header">
+      <span>🤖 AI Assistant</span>
+      <button onclick="toggleAiChat()" style="background:none;border:none;color:white;cursor:pointer;font-size:1rem;">✕</button>
+    </div>
+    <div id="ai-chat-messages"></div>
+    <div id="ai-input-row">
+      <input id="ai-chat-input" type="text" placeholder="Ask something..." onkeydown="if(event.key==='Enter')aiSend()" />
+      <button id="ai-chat-send" onclick="aiSend()">Send</button>
+    </div>
+  </div>
 
   <!-- Add resources panel -->
   <div id="add-panel" class="bottom-panel">
@@ -188,9 +167,12 @@
     <input type="text" id="panel-input" placeholder="e.g. food, blankets... press Enter" />
     <div id="panel-tags"></div>
     <button class="action-btn" onclick="saveResources()">Save & Update Map</button>
+    <hr style="margin:1rem 0;border:none;border-top:1px solid #eee">
+    <h4 style="margin:0 0 0.5rem;font-size:0.9rem;color:#64748b">Your current resources</h4>
+    <div id="my-resources"><p style="color:#94a3b8;font-size:0.85rem">Loading...</p></div>
   </div>
 
-  <!-- Conversations list panel -->
+  <!-- Conversations panel -->
   <div id="convos-panel" class="bottom-panel">
     <div class="panel-header">
       <h3>💬 Messages</h3>
@@ -210,7 +192,7 @@
     </div>
     <div id="messages-list"></div>
     <div id="chat-input-row">
-      <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendMessage()" />
+      <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage()" />
       <button id="chat-send" onclick="sendMessage()">Send</button>
     </div>
   </div>
@@ -222,57 +204,64 @@
     const identityPoolId = "us-east-1:0260092b-d425-423c-af14-b051783cf76b";
     const region = "us-east-1";
     const API_BASE = "https://dybar52ziekaj.cloudfront.net";
-    const role = localStorage.getItem('userRole') || 'both';
+    const userRole = localStorage.getItem('userRole') || 'both';
 
-    let isDark = false;
-    let isSatellite = false;
-    let currentFilter = 'match';
-    let mapInstance = null;
-    let userCenter = null;
-    let panelType = 'have';
-    let panelItems = [];
-    let youMarker = null;
-    let markers = [];
-    let activeChatRecipient = null;
-    let activeChatConvoId = null;
-    let chatPollInterval = null;
-    let unreadPollInterval = null;
+    let isDark = false, isSatellite = false, currentFilter = 'match';
+    let mapInstance = null, userCenter = null;
+    let panelType = 'have', panelItems = [];
+    let youMarker = null, markers = [];
+    let activeChatRecipient = null, activeChatConvoId = null;
+    let chatPollInterval = null, unreadPollInterval = null;
+    let lastMessageCount = 0;
+    let aiSessionId = crypto.randomUUID();
 
     function getToken() { return localStorage.getItem('id_token') || ''; }
     function getMyUserId() {
-      const token = getToken();
-      if (!token) return null;
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        return payload.sub;
-      } catch { return null; }
+      try { return JSON.parse(atob(getToken().split('.')[1])).sub; } catch { return null; }
     }
-
-    function getDisplayName() {
-      const token = getToken();
-      if (!token) return 'User';
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.name) return payload.name.split(' ')[0];
-        if (payload.email) return payload.email.split('@')[0].split('.')[0];
-      } catch {}
-      return 'User';
-    }
-
     function authHeaders() {
       return { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' };
     }
+    function formatTime(iso) {
+      return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
 
-    function formatTime(isoString) {
-      const d = new Date(isoString);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // --- AI chat ---
+    function toggleAiChat() {
+      document.getElementById('ai-chat-box').classList.toggle('open');
+    }
+    function aiAppend(text, role) {
+      const msgs = document.getElementById('ai-chat-messages');
+      const div = document.createElement('div');
+      div.className = `ai-msg ${role}`;
+      div.textContent = text;
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+      return div;
+    }
+    async function aiSend() {
+      const input = document.getElementById('ai-chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      aiAppend(text, 'user');
+      const thinking = aiAppend('...', 'bot');
+      try {
+        const res = await fetch(`${API_BASE}/api/chat`, {
+          method: 'POST', credentials: 'include',
+          headers: authHeaders(),
+          body: JSON.stringify({ message: text, session_id: aiSessionId })
+        });
+        const data = await res.json();
+        aiSessionId = data.session_id || aiSessionId;
+        thinking.textContent = data.reply || 'No response.';
+      } catch { thinking.textContent = 'Something went wrong. Try again.'; }
     }
 
     // --- map style ---
     function buildStyleUrl() {
       if (isSatellite) return `https://maps.geo.${region}.amazonaws.com/v2/styles/Satellite/descriptor`;
-      const scheme = isDark ? 'Dark' : 'Light';
-      return `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=${scheme}`;
+      return `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=${isDark ? 'Dark' : 'Light'}&terrain=Hillshade&contour-density=Medium&traffic=All`;
     }
     function toggleScheme() {
       isDark = !isDark;
@@ -288,16 +277,35 @@
       btn.classList.toggle('active', isSatellite);
       reloadStyle();
     }
+    function toggleTraffic() {
+      showTraffic = !showTraffic;
+      document.getElementById('btn-traffic').classList.toggle('active', showTraffic);
+      reloadStyle();
+    }
+    function toggleHillshade() {
+      showHillshade = !showHillshade;
+      document.getElementById('btn-hillshade').classList.toggle('active', showHillshade);
+      reloadStyle();
+    }
+    function toggleContour() {
+      showContour = !showContour;
+      document.getElementById('btn-contour').classList.toggle('active', showContour);
+      reloadStyle();
+    }
     function reloadStyle() {
       if (!mapInstance) return;
       mapInstance.setStyle(buildStyleUrl());
-      mapInstance.once('style.load', () => { youMarker = null; if (userCenter) loadPins(mapInstance, userCenter); });
+      mapInstance.once('style.load', () => {
+        youMarker = null;
+        if (userCenter) loadPins(mapInstance, userCenter);
+      });
     }
 
     // --- filter ---
     function setFilter(f) {
       currentFilter = f;
-      ['match','need','have','all'].forEach(x => document.getElementById(`f-${x}`).classList.toggle('active', x === f));
+      ['match','need','have','all'].forEach(x =>
+        document.getElementById(`f-${x}`).classList.toggle('active', x === f));
       if (mapInstance && userCenter) loadPins(mapInstance, userCenter);
     }
 
@@ -311,6 +319,7 @@
       closeAll();
       document.getElementById('add-panel').classList.add('open');
       document.getElementById('overlay').classList.add('open');
+      loadMyResources();
     }
     function openConversations() {
       closeAll();
@@ -347,11 +356,31 @@
       if (!panelItems.length) return;
       const loc = userCenter ? { lat: userCenter[0], lng: userCenter[1] } : { lat: null, lng: null };
       await fetch(`${API_BASE}/api/resources`, {
-        method: 'POST', credentials: 'include',
-        headers: authHeaders(),
+        method: 'POST', credentials: 'include', headers: authHeaders(),
         body: JSON.stringify({ type: panelType, items: [...panelItems], ...loc })
       });
-      panelItems = []; renderPanelTags(); closeAll();
+      panelItems = []; renderPanelTags();
+      loadMyResources();
+      if (mapInstance && userCenter) loadPins(mapInstance, userCenter);
+    }
+    async function loadMyResources() {
+      const container = document.getElementById('my-resources');
+      try {
+        const res = await fetch(`${API_BASE}/api/resources/mine`, { credentials: 'include', headers: authHeaders() });
+        const items = await res.json();
+        if (!items.length) { container.innerHTML = '<p style="color:#94a3b8;font-size:0.85rem">None added yet.</p>'; return; }
+        container.innerHTML = items.map(r => `
+          <div class="my-resource">
+            <div><b>${r.type === 'have' ? '🟢 Have' : '🔴 Need'}:</b> ${r.items.join(', ')}</div>
+            <button class="del-btn" onclick="deleteResource('${r.id}')">Remove</button>
+          </div>`).join('');
+      } catch { container.innerHTML = '<p style="color:#ef4444;font-size:0.85rem">Could not load.</p>'; }
+    }
+    async function deleteResource(id) {
+      await fetch(`${API_BASE}/api/resources/${id}`, {
+        method: 'DELETE', credentials: 'include', headers: authHeaders()
+      });
+      loadMyResources();
       if (mapInstance && userCenter) loadPins(mapInstance, userCenter);
     }
 
@@ -368,22 +397,17 @@
         list.innerHTML = convos.map(c => `
           <div class="convo-item" onclick="openChat('${c.other_user_id}','${c.other_name}','${c.conversation_id}')">
             <div class="convo-left">
-              <div class="convo-email">${c.other_name || c.other_user_id}</div>
+              <div class="convo-name">${c.other_name || c.other_user_id}</div>
               <div class="convo-preview">${c.last_message}</div>
             </div>
             <div class="convo-right">
               <div class="convo-time">${formatTime(c.last_timestamp)}</div>
               ${c.unread_count > 0 ? `<span class="unread-pill">${c.unread_count}</span>` : ''}
             </div>
-          </div>
-        `).join('');
-        updateUnreadBadge(convos.reduce((sum, c) => sum + (c.unread_count || 0), 0));
-      } catch (e) {
-        list.innerHTML = '<p style="color:#ef4444;text-align:center">Could not load messages.</p>';
-      }
+          </div>`).join('');
+        updateUnreadBadge(convos.reduce((s, c) => s + (c.unread_count || 0), 0));
+      } catch { list.innerHTML = '<p style="color:#ef4444;text-align:center">Could not load messages.</p>'; }
     }
-
-    let lastMessageCount = 0;
 
     function openChat(recipientId, recipientName, convoId) {
       activeChatRecipient = recipientId;
@@ -401,7 +425,9 @@
     async function fetchMessages() {
       if (!activeChatConvoId) return;
       try {
-        const res = await fetch(`${API_BASE}/api/messages/${activeChatConvoId}`, { credentials: 'include', headers: authHeaders() });
+        const encoded = encodeURIComponent(activeChatConvoId);
+        const res = await fetch(`${API_BASE}/api/messages?convo_id=${encoded}`, { credentials: 'include', headers: authHeaders() });
+        if (!res.ok) return;
         const msgs = await res.json();
         renderMessages(msgs);
       } catch (e) { console.warn('Could not fetch messages', e); }
@@ -410,36 +436,23 @@
     function renderMessages(msgs) {
       const myId = getMyUserId();
       const list = document.getElementById('messages-list');
-
-      if (msgs.length === lastMessageCount) {
-        // No new messages — just update read ticks in place
-        const myMsgs = msgs.filter(m => m.sender_id === myId);
+      if (!msgs.length) { list.innerHTML = '<p style="color:#94a3b8;text-align:center;margin-top:1rem">No messages yet.</p>'; return; }
+      if (msgs.length === lastMessageCount && lastMessageCount > 0) {
         list.querySelectorAll('.msg-bubble.msg-mine').forEach((bubble, i) => {
+          const myMsgs = msgs.filter(m => m.sender_id === myId);
           if (myMsgs[i]) {
             const tick = bubble.querySelector('.read-tick');
-            if (tick) {
-              tick.className = `read-tick ${myMsgs[i].read ? 'read' : ''}`;
-              tick.textContent = myMsgs[i].read ? '✓✓' : '✓';
-            }
+            if (tick) { tick.className = `read-tick ${myMsgs[i].read ? 'read' : ''}`; tick.textContent = myMsgs[i].read ? '✓✓' : '✓'; }
           }
         });
         return;
       }
-
       lastMessageCount = msgs.length;
       const wasAtBottom = list.scrollHeight - list.scrollTop <= list.clientHeight + 50;
       list.innerHTML = msgs.map(m => {
         const mine = m.sender_id === myId;
         const tick = mine ? `<span class="read-tick ${m.read ? 'read' : ''}">✓${m.read ? '✓' : ''}</span>` : '';
-        return `
-          <div class="msg-bubble ${mine ? 'msg-mine' : 'msg-theirs'}">
-            ${m.text}
-            <div class="msg-meta">
-              <span>${formatTime(m.timestamp)}</span>
-              ${tick}
-            </div>
-          </div>
-        `;
+        return `<div class="msg-bubble ${mine ? 'msg-mine' : 'msg-theirs'}">${m.text}<div class="msg-meta"><span>${formatTime(m.timestamp)}</span>${tick}</div></div>`;
       }).join('');
       if (wasAtBottom) list.scrollTop = list.scrollHeight;
     }
@@ -449,22 +462,10 @@
       const text = input.value.trim();
       if (!text || !activeChatRecipient) return;
       input.value = '';
-
-      // Optimistically show message immediately
-      const myId = getMyUserId();
-      const list = document.getElementById('messages-list');
-      const div = document.createElement('div');
-      div.className = 'msg-bubble msg-mine';
-      div.innerHTML = `${text}<div class="msg-meta"><span>${formatTime(new Date().toISOString())}</span><span class="read-tick">✓</span></div>`;
-      list.appendChild(div);
-      list.scrollTop = list.scrollHeight;
-      lastMessageCount++;
-
       try {
         await fetch(`${API_BASE}/api/messages`, {
-          method: 'POST', credentials: 'include',
-          headers: authHeaders(),
-          body: JSON.stringify({ recipient_id: activeChatRecipient, text })
+          method: 'POST', credentials: 'include', headers: authHeaders(),
+          body: JSON.stringify({ recipient_id: activeChatRecipient, recipient_name: document.getElementById('chat-title').textContent, text })
         });
         await fetchMessages();
       } catch (e) { console.warn('Could not send message', e); }
@@ -472,26 +473,25 @@
 
     function updateUnreadBadge(count) {
       const badge = document.getElementById('unread-badge');
-      if (count > 0) {
-        badge.textContent = count > 9 ? '9+' : count;
-        badge.classList.add('show');
-      } else {
-        badge.classList.remove('show');
-      }
+      badge.textContent = count > 9 ? '9+' : count;
+      badge.classList.toggle('show', count > 0);
     }
 
     async function pollUnread() {
       try {
         const res = await fetch(`${API_BASE}/api/conversations`, { credentials: 'include', headers: authHeaders() });
         const convos = await res.json();
-        updateUnreadBadge(convos.reduce((sum, c) => sum + (c.unread_count || 0), 0));
+        updateUnreadBadge(convos.reduce((s, c) => s + (c.unread_count || 0), 0));
       } catch {}
     }
 
     // --- pins ---
     async function loadPins(map, center) {
+      // remove only non-you markers
       markers.forEach(m => m.remove());
       markers = [];
+
+      // always keep/recreate you marker
       if (!youMarker) {
         const youEl = document.createElement('div');
         youEl.innerHTML = '📍'; youEl.style.fontSize = '2rem';
@@ -499,12 +499,16 @@
           .setLngLat([center[1], center[0]])
           .setPopup(new maplibregl.Popup().setHTML('<strong>You are here</strong>'))
           .addTo(map);
-        markers.push(youMarker);
       }
-      let apiRole = role;
-      if (currentFilter === 'need') apiRole = 'have';
-      else if (currentFilter === 'have') apiRole = 'need';
-      else if (currentFilter === 'all') apiRole = 'both';
+
+      // determine what to fetch based on filter
+      // "My Matches" → use userRole to find complementary users
+      // "All In Need" → show users who have need entries
+      // "All Offering" → show users who have entries
+      // "Everyone" → all users
+      let apiRole;
+      if (currentFilter === 'match') apiRole = userRole;
+      else apiRole = 'both';
 
       let matches = [];
       try {
@@ -512,46 +516,61 @@
         if (res.ok) matches = await res.json();
       } catch (e) { console.warn('Could not fetch matches', e); }
 
+      // client-side filter for need/have views
+      if (currentFilter === 'need') {
+        matches = matches.filter(m => m.entries.some(e => e.type === 'need'));
+      } else if (currentFilter === 'have') {
+        matches = matches.filter(m => m.entries.some(e => e.type === 'have'));
+      }
+
       matches.forEach(m => {
         if (!m.lat || !m.lng) return;
+
+        // build popup content from all entries
+        const entriesHtml = m.entries.map(e => {
+          const score = (currentFilter === 'match' && e.match_score > 0)
+            ? ` <small>🎯 ${e.match_score}</small>` : '';
+          return `<div><b>${e.type === 'need' ? '🔴 Needs' : '🟢 Has'}:</b> ${e.items.join(', ')}${score}</div>`;
+        }).join('');
+
+        // pick emoji based on whether user has need, have, or both
+        const hasNeed = m.entries.some(e => e.type === 'need');
+        const hasHave = m.entries.some(e => e.type === 'have');
+        const emoji = (hasNeed && hasHave) ? '🟡' : hasNeed ? '🔴' : '🟢';
+
         const el = document.createElement('div');
-        el.innerHTML = m.type === 'need' ? '🔴' : '🟢';
+        el.innerHTML = emoji;
         el.style.fontSize = '1.5rem'; el.style.cursor = 'pointer';
-        const score = (currentFilter === 'match' && m.match_score > 0)
-          ? `<br><small>🎯 ${m.match_score} match${m.match_score > 1 ? 'es' : ''}</small>` : '';
+
         const popup = new maplibregl.Popup({ offset: 20 }).setHTML(`
-          <b>${m.type === 'need' ? 'Needs' : 'Has'}:</b> ${m.items.join(', ')}${score}
-          <br><button onclick="startChat('${m.user_id}','${m.display_name || m.email}')"
+          <b>${m.display_name || 'User'}</b>
+          ${entriesHtml}
+          <button onclick="startChat('${m.user_id}','${m.display_name || ''}')"
             style="margin-top:0.5rem;padding:0.3rem 0.75rem;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem;">
             💬 Message
-          </button>
-        `);
+          </button>`);
         const marker = new maplibregl.Marker({ element: el })
-          .setLngLat([m.lng, m.lat])
-          .setPopup(popup)
-          .addTo(map);
+          .setLngLat([m.lng, m.lat]).setPopup(popup).addTo(map);
         markers.push(marker);
       });
     }
 
-    function startChat(userId, email) {
+    function startChat(userId, name) {
       const myId = getMyUserId();
       if (!myId) return;
       const convoId = [myId, userId].sort().join('#');
       document.querySelectorAll('.maplibregl-popup').forEach(p => p.remove());
       closeAll();
       document.getElementById('overlay').classList.add('open');
-      openChat(userId, email, convoId);
+      openChat(userId, name, convoId);
     }
 
     async function initializeMap(center) {
       userCenter = center;
       const authHelper = await amazonLocationAuthHelper.withIdentityPoolId(identityPoolId);
       const map = new maplibregl.Map({
-        container: "map",
-        style: buildStyleUrl(),
-        center: [center[1], center[0]],
-        zoom: 14,
+        container: "map", style: buildStyleUrl(),
+        center: [center[1], center[0]], zoom: 14,
         ...authHelper.getMapAuthenticationOptions()
       });
       map.addControl(new maplibregl.NavigationControl(), "top-left");
@@ -564,11 +583,8 @@
         pos => initializeMap([pos.coords.latitude, pos.coords.longitude]),
         () => initializeMap([37.7749, -122.4194])
       );
-    } else {
-      initializeMap([37.7749, -122.4194]);
-    }
+    } else { initializeMap([37.7749, -122.4194]); }
 
-    // poll for unread messages every 10 seconds
     unreadPollInterval = setInterval(pollUnread, 10000);
     pollUnread();
   </script>

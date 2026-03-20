@@ -5,37 +5,197 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>How can we help?</title>
   <style>
-    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-    h1 { margin-bottom: 0.5rem; }
-    p { color: #555; margin-bottom: 2rem; }
-    .options { display: flex; gap: 1rem; }
-    .card { padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; text-align: center; border: 2px solid transparent; transition: border-color 0.2s; }
-    .card:hover { border-color: #2563eb; }
-    .card h2 { margin: 0 0 0.5rem; }
-    .card p { margin: 0; font-size: 0.9rem; }
-    .btn { margin-top: 2rem; padding: 0.75rem 2.5rem; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; opacity: 0.4; pointer-events: none; }
-    .btn.active { opacity: 1; pointer-events: auto; }
-    .skip { margin-top: 1rem; background: none; border: none; color: #888; font-size: 0.9rem; cursor: pointer; text-decoration: underline; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #0f172a;
+      color: white;
+    }
+
+    .globe-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .globe-bg svg { width: 100%; height: 100%; }
+
+    .glow {
+      position: fixed;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(37,99,235,0.25) 0%, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 0;
+      animation: pulse 4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+      50% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+    }
+
+    .pin {
+      position: fixed;
+      border-radius: 50%;
+      z-index: 1;
+      animation: float 6s ease-in-out infinite;
+    }
+    .pin::after {
+      content: '';
+      display: block;
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      background: inherit;
+      animation: ripple 3s ease-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    @keyframes ripple {
+      0% { transform: scale(1); opacity: 0.6; }
+      100% { transform: scale(3); opacity: 0; }
+    }
+
+    .card {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 2.5rem 3rem;
+      max-width: 560px;
+      width: 92%;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+
+    .card h1 { font-size: 1.7rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .card > p { color: rgba(255,255,255,0.55); font-size: 0.95rem; margin-bottom: 1.75rem; }
+
+    .options { display: flex; gap: 1rem; justify-content: center; }
+
+    .option-card {
+      flex: 1;
+      padding: 1.5rem 1rem;
+      background: rgba(255,255,255,0.06);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .option-card:hover { border-color: rgba(99,179,237,0.5); background: rgba(255,255,255,0.1); }
+    .option-card.selected { border-color: #3b82f6; background: rgba(59,130,246,0.15); }
+    .option-card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; color: white; }
+    .option-card p { font-size: 0.82rem; color: rgba(255,255,255,0.5); margin: 0; }
+
+    .actions { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.75rem; }
+
+    .btn {
+      width: 100%;
+      padding: 0.8rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s, opacity 0.2s;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      opacity: 0.35;
+      pointer-events: none;
+      box-shadow: 0 4px 16px rgba(37,99,235,0.35);
+    }
+    .btn-primary.active { opacity: 1; pointer-events: auto; }
+    .btn-primary.active:hover { background: #1d4ed8; transform: translateY(-1px); }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.8);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.14); transform: translateY(-1px); }
   </style>
 </head>
 <body>
-  <h1>How can we help?</h1>
-  <p>Select what applies to you — you can choose both.</p>
-  <div class="options">
-    <div class="card" data-role="need" onclick="toggle(this)">
-      <h2>🙏 I Need Resources</h2>
-      <p>Find food, shelter, supplies, or support near you.</p>
+
+  <div class="globe-bg">
+    <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#1e3a5f" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#0f172a" stop-opacity="1"/>
+        </radialGradient>
+      </defs>
+      <rect width="1000" height="1000" fill="url(#bgGrad)"/>
+      <g stroke="rgba(99,179,237,0.12)" stroke-width="1" fill="none">
+        <ellipse cx="500" cy="500" rx="380" ry="380"/>
+        <ellipse cx="500" cy="500" rx="380" ry="285"/>
+        <ellipse cx="500" cy="500" rx="380" ry="190"/>
+        <ellipse cx="500" cy="500" rx="380" ry="95"/>
+        <ellipse cx="500" cy="500" rx="380" ry="38"/>
+        <ellipse cx="500" cy="500" rx="95" ry="380"/>
+        <ellipse cx="500" cy="500" rx="190" ry="380"/>
+        <ellipse cx="500" cy="500" rx="285" ry="380"/>
+        <line x1="500" y1="120" x2="500" y2="880"/>
+      </g>
+      <circle cx="500" cy="500" r="380" stroke="rgba(99,179,237,0.18)" stroke-width="1.5" fill="none"/>
+      <g fill="rgba(59,130,246,0.15)" stroke="rgba(99,179,237,0.2)" stroke-width="1">
+        <ellipse cx="420" cy="430" rx="90" ry="60"/>
+        <ellipse cx="560" cy="400" rx="60" ry="80"/>
+        <ellipse cx="500" cy="560" rx="110" ry="50"/>
+        <ellipse cx="340" cy="530" rx="45" ry="35"/>
+        <ellipse cx="650" cy="520" rx="55" ry="40"/>
+        <ellipse cx="480" cy="330" rx="30" ry="20"/>
+      </g>
+      <g fill="rgba(148,163,184,0.08)">
+        <circle cx="200" cy="200" r="2"/><circle cx="300" cy="150" r="2"/><circle cx="700" cy="200" r="2"/>
+        <circle cx="800" cy="300" r="2"/><circle cx="150" cy="600" r="2"/><circle cx="850" cy="650" r="2"/>
+        <circle cx="250" cy="750" r="2"/><circle cx="750" cy="800" r="2"/><circle cx="600" cy="150" r="2"/>
+        <circle cx="400" cy="850" r="2"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="glow"></div>
+
+  <div class="pin" style="width:10px;height:10px;background:#3b82f6;top:28%;left:35%;animation-delay:0s"></div>
+  <div class="pin" style="width:8px;height:8px;background:#10b981;top:55%;left:62%;animation-delay:1.5s"></div>
+  <div class="pin" style="width:12px;height:12px;background:#f59e0b;top:38%;left:68%;animation-delay:0.8s"></div>
+  <div class="pin" style="width:7px;height:7px;background:#3b82f6;top:65%;left:30%;animation-delay:2.2s"></div>
+  <div class="pin" style="width:9px;height:9px;background:#10b981;top:22%;left:58%;animation-delay:3s"></div>
+
+  <div class="card">
+    <h1>How can we help?</h1>
+    <p>Select what applies to you — you can choose both.</p>
+    <div class="options">
+      <div class="option-card" data-role="need" onclick="toggle(this)">
+        <h2>🙏 I Need Resources</h2>
+        <p>Find food, shelter, supplies, or support near you.</p>
+      </div>
+      <div class="option-card" data-role="have" onclick="toggle(this)">
+        <h2>🤝 I Have Resources</h2>
+        <p>Offer help, supplies, or services to those nearby.</p>
+      </div>
     </div>
-    <div class="card" data-role="have" onclick="toggle(this)">
-      <h2>🤝 I Have Resources</h2>
-      <p>Offer help, supplies, or services to those nearby.</p>
+    <div class="actions">
+      <button class="btn btn-primary" id="continueBtn" onclick="proceed()">Continue</button>
+      <button class="btn btn-secondary" onclick="skipToMap()">🌍 Show me the map</button>
     </div>
   </div>
-  <button class="btn" id="continueBtn" onclick="proceed()">Continue</button>
-  <button class="skip" onclick="skipToMap()">Skip — just show me the map</button>
 
   <script>
-    // Store token from URL fragment if present
     const hash = window.location.hash;
     if (hash.includes('token=')) {
       const token = hash.split('token=')[1];
@@ -49,10 +209,10 @@
       const role = card.dataset.role;
       if (selected.has(role)) {
         selected.delete(role);
-        card.style.borderColor = 'transparent';
+        card.classList.remove('selected');
       } else {
         selected.add(role);
-        card.style.borderColor = '#2563eb';
+        card.classList.add('selected');
       }
       document.getElementById('continueBtn').classList.toggle('active', selected.size > 0);
     }
