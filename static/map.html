@@ -4,13 +4,40 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Nearby Resources</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
+    * { box-sizing: border-box; }
     body { margin: 0; font-family: sans-serif; }
-    #header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: #2563eb; color: white; }
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: #2563eb;
+      color: white;
+      height: 50px;
+      position: relative;
+      z-index: 10;
+    }
     #header h1 { margin: 0; font-size: 1.1rem; }
-    #map { height: calc(100vh - 50px); }
-    .legend { background: white; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.85rem; line-height: 1.8; }
+    #map { height: calc(100vh - 50px); width: 100%; }
+    .legend {
+      position: absolute;
+      bottom: 2rem;
+      right: 1rem;
+      background: white;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      z-index: 5;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .maplibregl-popup-content {
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -19,56 +46,100 @@
     <a href="/logout" style="color:white; font-size:0.85rem;">Logout</a>
   </div>
   <div id="map"></div>
+  <div class="legend">🔴 Needs resources<br>🟢 Has resources</div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/@aws/amazon-location-utilities-auth-helper@1.x/dist/amazonLocationAuthHelper.js"></script>
   <script>
+    const identityPoolId = "us-east-1:0260092b-d425-423c-af14-b051783cf76b";
+    const region = "us-east-1";
+    const API_BASE = "https://dybar52ziekaj.cloudfront.net";
     const role = localStorage.getItem('userRole') || 'both';
-    const map = L.map('map');
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    function addPins(map, matches, center) {
+      // "You are here" marker
+      const youEl = document.createElement('div');
+      youEl.innerHTML = '📍';
+      youEl.style.fontSize = '2rem';
+      new maplibregl.Marker({ element: youEl })
+        .setLngLat([center[1], center[0]])
+        .setPopup(new maplibregl.Popup().setHTML('<strong>You are here</strong>'))
+        .addTo(map);
 
-    // Legend
-    const legend = L.control({ position: 'bottomright' });
-    legend.onAdd = () => {
-      const div = L.DomUtil.create('div', 'legend');
-      div.innerHTML = '🔴 Needs resources<br>🟢 Has resources';
-      return div;
-    };
-    legend.addTo(map);
-
-    function addMockPins(center) {
-      fetch(`https://dybar52ziekaj.cloudfront.net/api/match?role=${role}`, { credentials: 'include' })
-        .then(r => r.json())
-        .then(matches => {
-          matches.forEach(m => {
-            if (!m.lat || !m.lng) return;
-            const color = m.type === 'need' ? '🔴' : '🟢';
-            const icon = L.divIcon({ html: `<span style="font-size:1.5rem">${color}</span>`, className: '', iconAnchor: [12, 12] });
-            L.marker([m.lat, m.lng], { icon })
-              .addTo(map)
-              .bindPopup(`<b>${m.type === 'need' ? 'Needs' : 'Has'}:</b> ${m.items.join(', ')}`);
-          });
+      if (!matches || matches.length === 0) {
+        // Fall back to mock pins if no real data yet
+        const mockPins = [
+          { type: 'need', label: 'Family needs food & supplies', offset: [0.005, 0.008] },
+          { type: 'need', label: 'Individual needs shelter', offset: [-0.003, 0.012] },
+          { type: 'have', label: 'Offering: canned goods & clothing', offset: [0.009, -0.006] },
+          { type: 'have', label: 'Offering: transportation & meals', offset: [-0.007, -0.009] },
+          { type: 'need', label: 'Senior needs medication pickup', offset: [0.002, 0.003] },
+        ];
+        mockPins.forEach(pin => {
+          const el = document.createElement('div');
+          el.innerHTML = pin.type === 'need' ? '🔴' : '🟢';
+          el.style.fontSize = '1.5rem';
+          el.style.cursor = 'pointer';
+          new maplibregl.Marker({ element: el })
+            .setLngLat([center[1] + pin.offset[1], center[0] + pin.offset[0]])
+            .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(`<div>${pin.label}</div>`))
+            .addTo(map);
         });
+        return;
+      }
+
+      // Real pins from API
+      matches.forEach(m => {
+        if (!m.lat || !m.lng) return;
+        const el = document.createElement('div');
+        el.innerHTML = m.type === 'need' ? '🔴' : '🟢';
+        el.style.fontSize = '1.5rem';
+        el.style.cursor = 'pointer';
+        new maplibregl.Marker({ element: el })
+          .setLngLat([m.lng, m.lat])
+          .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(
+            `<b>${m.type === 'need' ? 'Needs' : 'Has'}:</b> ${m.items.join(', ')}`
+          ))
+          .addTo(map);
+      });
     }
 
-    // Center map on user location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(pos => {
-        const center = [pos.coords.latitude, pos.coords.longitude];
-        map.setView(center, 14);
-        L.marker(center).addTo(map).bindPopup('You are here').openPopup();
-        addMockPins(center);
-      }, () => fallback());
-    } else {
-      fallback();
+    async function initializeMap(center) {
+      const authHelper = await amazonLocationAuthHelper.withIdentityPoolId(identityPoolId);
+
+      const map = new maplibregl.Map({
+        container: "map",
+        style: `https://maps.geo.${region}.amazonaws.com/v2/styles/Standard/descriptor?color-scheme=Light`,
+        center: [center[1], center[0]],
+        zoom: 14,
+        ...authHelper.getMapAuthenticationOptions()
+      });
+
+      map.addControl(new maplibregl.NavigationControl(), "top-left");
+
+      // Fetch real matches from API
+      let matches = [];
+      try {
+        const res = await fetch(`${API_BASE}/api/match?role=${role}`, { credentials: 'include' });
+        if (res.ok) matches = await res.json();
+      } catch (e) {
+        console.warn('Could not fetch matches, using mock pins', e);
+      }
+
+      map.on('load', () => addPins(map, matches, center));
     }
 
     function fallback() {
-      const center = [37.7749, -122.4194]; // San Francisco default
-      map.setView(center, 13);
-      addMockPins(center);
+      initializeMap([37.7749, -122.4194]);
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => initializeMap([pos.coords.latitude, pos.coords.longitude]),
+        () => fallback()
+      );
+    } else {
+      fallback();
     }
   </script>
 </body>
