@@ -2,7 +2,7 @@ from flask import Flask, redirect, request, make_response, jsonify
 from authlib.integrations.flask_client import OAuth
 from flask_cors import CORS
 import os, json, uuid
-import os, boto3
+import os, boto3, uuid
 from functools import wraps
 from jose import jwt
 
@@ -92,6 +92,7 @@ def post_resource():
     body = request.get_json()
     entry = {
         'user_id': user.get('sub'),
+        'id': str(uuid.uuid4()),
         'type': body.get('type'),
         'email': user.get('email'),
         'items': body.get('items', []),
@@ -100,6 +101,34 @@ def post_resource():
     }
     table.put_item(Item=entry)
     return jsonify(entry), 201
+
+@app.route('/api/resources/<resource_id>', methods=['PUT'])
+@require_auth
+def update_resource(resource_id):
+    user = get_current_user()
+    body = request.get_json()
+    table.update_item(
+        Key={'user_id': user.get('sub'), 'id': resource_id},
+        UpdateExpression='SET #items = :items, #type = :type',
+        ExpressionAttributeNames={'#items': 'items', '#type': 'type'},
+        ExpressionAttributeValues={':items': body.get('items', []), ':type': body.get('type')}
+    )
+    return jsonify({'status': 'updated'})
+
+@app.route('/api/resources/<resource_id>', methods=['DELETE'])
+@require_auth
+def delete_resource(resource_id):
+    user = get_current_user()
+    table.delete_item(Key={'user_id': user.get('sub'), 'id': resource_id})
+    return jsonify({'status': 'deleted'})
+
+@app.route('/api/resources/mine', methods=['GET'])
+@require_auth
+def get_my_resources():
+    user = get_current_user()
+    from boto3.dynamodb.conditions import Key
+    result = table.query(KeyConditionExpression=Key('user_id').eq(user.get('sub')))
+    return jsonify(result.get('Items', []))
 
 @app.route('/api/match', methods=['GET'])
 @require_auth

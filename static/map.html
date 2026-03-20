@@ -69,6 +69,11 @@
     #add-panel .save-btn { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-top: 1rem; }
     #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 25; }
     #overlay.open { display: block; }
+    .my-resource { display: flex; align-items: flex-start; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+    .my-resource .actions { display: flex; gap: 0.4rem; flex-shrink: 0; margin-left: 0.5rem; }
+    .my-resource .actions button { padding: 0.2rem 0.5rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+    .del-btn { background: #fee2e2; color: #dc2626; }
+    .edit-btn { background: #e0e7ff; color: #3730a3; }
   </style>
 </head>
 <body>
@@ -104,6 +109,9 @@
     <input type="text" id="panel-input" placeholder="e.g. food, blankets... press Enter" />
     <div id="panel-tags"></div>
     <button class="save-btn" onclick="saveResources()">Save & Update Map</button>
+    <hr style="margin:1rem 0; border:none; border-top:1px solid #eee;">
+    <h4 style="margin:0 0 0.75rem">Your Resources</h4>
+    <div id="my-resources"></div>
   </div>
 
   <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
@@ -172,6 +180,7 @@
     function openPanel() {
       document.getElementById('add-panel').classList.add('open');
       document.getElementById('overlay').classList.add('open');
+      loadMyResources();
     }
     function closePanel() {
       document.getElementById('add-panel').classList.remove('open');
@@ -205,6 +214,34 @@
       panelItems = [];
       renderPanelTags();
       closePanel();
+      if (mapInstance && userCenter) loadPins(mapInstance, userCenter);
+    }
+
+    async function loadMyResources() {
+      const res = await fetch(`${API_BASE}/api/resources/mine`, {
+        credentials: 'include',
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      if (!res.ok) return;
+      const items = await res.json();
+      const container = document.getElementById('my-resources');
+      if (!items.length) { container.innerHTML = '<p style="color:#888;font-size:0.85rem">No resources added yet.</p>'; return; }
+      container.innerHTML = items.map(r => `
+        <div class="my-resource">
+          <div><span style="font-weight:600">${r.type === 'have' ? '🟢 Have' : '🔴 Need'}:</span> ${r.items.join(', ')}</div>
+          <div class="actions">
+            <button class="del-btn" onclick="deleteResource('${r.id}')">Remove</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function deleteResource(id) {
+      await fetch(`${API_BASE}/api/resources/${id}`, {
+        method: 'DELETE', credentials: 'include',
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      loadMyResources();
       if (mapInstance && userCenter) loadPins(mapInstance, userCenter);
     }
 
